@@ -1,0 +1,16 @@
+[project]
+name = "python-dice"
+version = "0.1.0"
+description = "A Python implementation of differential centrality-ensemble analysis based on gene expression profiles and protein–protein interaction networks"
+readme = "README.md"
+authors = [
+    { name = "David Buchmann", email = "david@david-buchmann.de" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "scikit-learn>=1.8.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.3,<0.10.0"]
+build-backend = "uv_build"
