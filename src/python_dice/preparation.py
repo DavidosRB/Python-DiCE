@@ -32,7 +32,7 @@ def filter_dea_table(dea_df: pd.DataFrame, pval_threshold: float = 0.05, fc_thre
 
 
 def get_gene_id_mappings(force_download: bool = False)-> dict[str, str]:
-    url = "https://www.genenames.org/cgi-bin/download/custom?col=gd_hgnc_id&col=gd_pub_eg_id&col=gd_pub_ensembl_id&status=Approved&status=Entry%20Withdrawn&hgnc_dbtag=on&order_by=gd_hgnc_id&format=text&submit=submit"
+    url = "https://www.genenames.org/cgi-bin/download/custom?col=gd_hgnc_id&col=gd_app_sym&col=gd_pub_eg_id&col=gd_pub_ensembl_id&status=Approved&status=Entry%20Withdrawn&hgnc_dbtag=on&order_by=gd_hgnc_id&format=text&submit=submit"
     gene_id_mappings_file_path = os.path.join("..", "data", "gene_id_mappings.txt")
 
     if not os.path.exists(gene_id_mappings_file_path) or force_download:
@@ -45,7 +45,7 @@ def get_gene_id_mappings(force_download: bool = False)-> dict[str, str]:
     else:
         print(f"File {gene_id_mappings_file_path} already exists. If you want to download it again, set force_download to True.")
     
-    # Now, we turn this downloaded file into a dataframe and return the mapping from each of the columns to HGNC ID as a dictionary
+    # Now, we turn this downloaded file into a dataframe
     # Note that the NCBI ID will be cast into a string to prevent it from becoming a float 
     gene_id_df = pd.read_csv(os.path.join("..", "data", "gene_id_mappings.txt"), sep="\t", dtype={"NCBI Gene ID": str})
 
@@ -102,3 +102,81 @@ def filter_candidate_genes(raw_df: pd.DataFrame, dea_df: pd.DataFrame, gene_id_c
 
 
     return filtered_raw_df
+
+def get_string_db(force_download: bool = False)-> tuple[pd.DataFrame, pd.DataFrame]:
+    """Get the two necessary files from the StringDB and return them as Pandas DataFrames
+
+    Parameters
+    ----------
+    force_download : bool, optional
+        Whether or not to force the download of the files even if they already exist, by default False
+
+    Returns
+    -------
+    tuple[pd.DataFrame, pd.DataFrame]
+        The two Dataframes we extract from the StringDB - the links between proteins and the (additional) information we need
+    """
+    links_url = "https://stringdb-downloads.org/download/stream/protein.links.v12.0/9606.protein.links.v12.0.min400.onlyAB.txt.gz"
+    info_url = "https://stringdb-downloads.org/download/protein.info.v12.0/9606.protein.info.v12.0.txt.gz"
+
+    protein_links_file_path = os.path.join("..", "data", "9606.protein.links.v12.0.min400.onlyAB.txt.gz")
+    protein_info_file_path = os.path.join("..", "data", "9606.protein.info.v12.0.txt.gz")
+
+    # First, download protein links
+    if not os.path.exists(protein_links_file_path) or force_download:
+        # Get the file from the stringdb downloads site
+        response = requests.get(links_url)
+        # Save the response text to a local .txt file
+        with open(protein_links_file_path, "w", encoding="utf-8") as file:
+            file.write(response.text)
+        print(f"File saved to {protein_links_file_path}")
+    else:
+        print(f"File {protein_links_file_path} already exists. If you want to download it again, set force_download to True.")
+    
+    # Then, download protein info
+    if not os.path.exists(protein_info_file_path) or force_download:
+        # Get the file from the stringdb downloads site
+        response = requests.get(info_url)
+        # Save the response text to a local .txt file
+        with open(protein_info_file_path, "w", encoding="utf-8") as file:
+            file.write(response.text)
+        print(f"File saved to {protein_info_file_path}")
+    else:
+        print(f"File {protein_info_file_path} already exists. If you want to download it again, set force_download to True.")
+
+
+    # We can then turn these files into dataframes using Pandas and return them
+
+    protein_links_df = pd.read_csv(protein_links_file_path, sep=" ")
+    protein_info_df = pd.read_csv(protein_info_file_path, sep="\t")
+
+    return protein_links_df, protein_info_df
+
+
+def map_protein_links_symbols(protein_links_df: pd.DataFrame, protein_info_df: pd.DataFrame) -> pd.DataFrame:
+    """Map the Ensembl Protein IDs from the StringDB's Protein Links file/table to use HGNC symbols instead
+
+    Parameters
+    ----------
+    protein_links_df : pd.DataFrame
+        The StringDB's links and relationships between proteins, in a Pandas DataFrame
+    protein_info_df : pd.DataFrame
+        The StringDB's (additional) information for every protein, including the preferred HGNC symbol for eveery Ensembl Protein ID, in a Pandas DataFrame
+
+    Returns
+    -------
+    pd.DataFrame
+        The original protein_links_df, but now with HGNC symbols instead of Ensembl Protein IDs in the 2 protein columns
+    """
+
+    # Get the mapping from Ensemble Protein ID to HGNC Symbol using the protein Info DataFrame
+    # Zipping the two columns and turning them into a dictionary turns them into a dictionary with ENSP IDs as Keys and HGNC symbols as value
+    ensp_symbol_mapping_dict = dict(zip(protein_info_df["#string_protein_id"], protein_info_df["preferred_name"]))
+    # Using this dictionary, we can then map the column of the protein links DataFrame
+    mapped_protein_links_df = protein_links_df.copy()
+    # Map both relevant columns to use HGNC Symbols instead of ENSP IDs
+    mapped_protein_links_df["protein1"] = mapped_protein_links_df["protein1"].map(ensp_symbol_mapping_dict)
+    mapped_protein_links_df["protein2"] = mapped_protein_links_df["protein2"].map(ensp_symbol_mapping_dict)
+
+    return mapped_protein_links_df
+
