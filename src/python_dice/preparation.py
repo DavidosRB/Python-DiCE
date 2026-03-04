@@ -72,3 +72,33 @@ def convert_series_to_hgnc(series: pd.Series|Any, gene_id_mappings: dict) -> pd.
     series = series.map(lambda x: gene_id_mappings.get(str(x)))
 
     return series
+
+def filter_candidate_genes(raw_df: pd.DataFrame, dea_df: pd.DataFrame, gene_id_column: Optional[str] = None, candidate_gene_column: str = "GeneID") -> pd.DataFrame:
+    """Filter the raw DataFrame and keep only genes present in the candidate genes
+
+    Parameters
+    ----------
+    raw_df : pd.DataFrame
+        The raw gene expression data to filter using candidate genes
+    gene_id_column : str
+        The column that contains the gene IDs in the raw data
+    dea_df: pd.DataFrame 
+        The filtered DEA data that contains only the candidate genes
+    candidate_gene_column: str
+        The column where to find the gene IDs in the DEA filtered data. From GEO2R results, this should usually be "GeneID".
+
+    Returns
+    -------
+    pd.DataFrame
+        The filtered DataFrame that only contains candidate genes
+    """
+    # Turn candidate genes to a set for easier comparison
+    set_candidate_genes = set(dea_df[candidate_gene_column])
+
+    if gene_id_column is None:
+        filtered_raw_df = raw_df.loc[raw_df.index.isin(set_candidate_genes)]
+    else:
+        filtered_raw_df = raw_df.loc[raw_df[gene_id_column].isin(set_candidate_genes)]
+
+
+    return filtered_raw_df
