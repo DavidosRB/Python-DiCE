@@ -118,6 +118,7 @@ def get_string_db(force_download: bool = False)-> tuple[pd.DataFrame, pd.DataFra
     """
     links_url = "https://stringdb-downloads.org/download/stream/protein.links.v12.0/9606.protein.links.v12.0.min400.onlyAB.txt.gz"
     info_url = "https://stringdb-downloads.org/download/protein.info.v12.0/9606.protein.info.v12.0.txt.gz"
+    
 
     protein_links_file_path = os.path.join("..", "data", "9606.protein.links.v12.0.min400.onlyAB.txt.gz")
     protein_info_file_path = os.path.join("..", "data", "9606.protein.info.v12.0.txt.gz")
@@ -126,9 +127,10 @@ def get_string_db(force_download: bool = False)-> tuple[pd.DataFrame, pd.DataFra
     if not os.path.exists(protein_links_file_path) or force_download:
         # Get the file from the stringdb downloads site
         response = requests.get(links_url)
+        response.raw.decode_content = False  # Prevent auto-decompression
         # Save the response text to a local .txt file
-        with open(protein_links_file_path, "w", encoding="utf-8") as file:
-            file.write(response.text)
+        with open(protein_links_file_path, "wb") as file: # Use "wb" to write the content as bytes since it's a gzipped file
+            file.write(response.content) # Also write content instead of text since it's a gzipped file
         print(f"File saved to {protein_links_file_path}")
     else:
         print(f"File {protein_links_file_path} already exists. If you want to download it again, set force_download to True.")
@@ -137,9 +139,10 @@ def get_string_db(force_download: bool = False)-> tuple[pd.DataFrame, pd.DataFra
     if not os.path.exists(protein_info_file_path) or force_download:
         # Get the file from the stringdb downloads site
         response = requests.get(info_url)
+        response.raw.decode_content = False  # Prevent auto-decompression
         # Save the response text to a local .txt file
-        with open(protein_info_file_path, "w", encoding="utf-8") as file:
-            file.write(response.text)
+        with open(protein_info_file_path, "wb") as file:
+            file.write(response.content)
         print(f"File saved to {protein_info_file_path}")
     else:
         print(f"File {protein_info_file_path} already exists. If you want to download it again, set force_download to True.")
@@ -147,8 +150,8 @@ def get_string_db(force_download: bool = False)-> tuple[pd.DataFrame, pd.DataFra
 
     # We can then turn these files into dataframes using Pandas and return them
 
-    protein_links_df = pd.read_csv(protein_links_file_path, sep=" ")
-    protein_info_df = pd.read_csv(protein_info_file_path, sep="\t")
+    protein_links_df = pd.read_csv(protein_links_file_path, sep=" ", compression="gzip") # Note that the file is gzipped, so we need to specify this in the read_csv function
+    protein_info_df = pd.read_csv(protein_info_file_path, sep="\t", compression="gzip")
 
     return protein_links_df, protein_info_df
 
